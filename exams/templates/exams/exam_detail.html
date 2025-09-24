@@ -1,0 +1,297 @@
+{% extends 'exams/base.html' %}
+{% load extras %}
+
+{% block extra_head %}
+<style>
+  /* Page background & container */
+  body {
+    background: linear-gradient(135deg,#f6d365 0%,#fda085 50%, #fbc2eb 100%);
+    min-height: 100vh;
+  }
+  .exam-wrap {
+    max-width: 1100px;
+    margin: 40px auto 80px;
+    padding: 28px;
+  }
+
+  /* Timer */
+  #timer {
+    position: fixed;
+    top: 20px;
+    right: 28px;
+    z-index: 9999;
+    background: rgba(255,255,255,0.95);
+    padding: 12px 18px;
+    border-radius: 12px;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.12);
+    font-weight: 800;
+    font-size: 20px;
+    color: #7c3aed; /* purple */
+    border: 1px solid rgba(124,58,237,0.12);
+  }
+
+  /* Card for each question */
+  .question-card {
+    background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(255,255,255,0.95));
+    border-radius: 16px;
+    padding: 36px;
+    box-shadow: 0 10px 30px rgba(18, 38, 63, 0.08);
+    margin-bottom: 24px;
+  }
+
+  .question-number {
+    display:inline-block;
+    padding:6px 12px;
+    border-radius:10px;
+    background: rgba(124,58,237,0.06);
+    color: #4c1d95;
+    font-weight:700;
+    margin-bottom:12px;
+    font-size:0.95rem;
+  }
+
+  .question-text {
+    font-size: 1.7rem;
+    line-height:1.35;
+    font-weight: 800;
+    margin: 12px 0 24px;
+    color: #0f172a;
+  }
+
+  /* Choice buttons */
+  .choices {
+    display:block;
+    gap:12px;
+  }
+  .choice-btn {
+    display:flex;
+    align-items:center;
+    gap:14px;
+    width:100%;
+    border-radius:12px;
+    padding:18px 18px;
+    font-size:1.1rem;
+    font-weight:700;
+    cursor:pointer;
+    border:2px solid rgba(15,23,42,0.06);
+    background: linear-gradient(90deg,#ffffff,#fbfbff);
+    transition: transform .12s ease, box-shadow .12s ease, background .12s ease;
+    box-shadow: 0 6px 18px rgba(16,24,40,0.04);
+    margin-bottom:12px;
+  }
+  .choice-btn:hover { transform: translateY(-3px); box-shadow: 0 12px 30px rgba(16,24,40,0.08); }
+  .choice-btn input[type="radio"] { transform: scale(1.4); margin-right:14px; }
+
+  /* active selection style */
+  .choice-btn.active {
+    background: linear-gradient(90deg,#7c3aed,#6d28d9);
+    color: white;
+    border-color: rgba(124,58,237,0.9);
+    box-shadow: 0 12px 30px rgba(124,58,237,0.18);
+  }
+
+  /* Navigation numbering strip */
+  .q-strip {
+    display:flex;
+    gap:8px;
+    flex-wrap:wrap;
+    justify-content:center;
+    margin: 20px 0 8px;
+    padding: 12px 8px;
+    background: rgba(255,255,255,0.6);
+    border-radius: 12px;
+    box-shadow: 0 6px 18px rgba(15,23,42,0.03);
+    overflow-x:auto;
+  }
+  .q-btn {
+    min-width:44px;
+    height:44px;
+    display:inline-grid;
+    place-items:center;
+    padding:0 10px;
+    border-radius: 10px;
+    font-weight:800;
+    font-size:0.95rem;
+    border: 0;
+    cursor:pointer;
+    transition: transform .08s ease, opacity .12s ease;
+  }
+  .q-btn:hover { transform: translateY(-3px); }
+  .q-btn.unanswered { background:#e6e6e8; color:#334155; }
+  .q-btn.answered { background:#10b981; color:white; }       /* green */
+  .q-btn.current  { background: linear-gradient(90deg,#7c3aed,#6d28d9); color:white; }  /* purple */
+
+  /* Controls */
+  .controls { display:flex; gap:10px; justify-content:center; margin-top:18px; }
+  .controls .btn { padding:10px 18px; font-weight:700; border-radius:10px; }
+
+  /* Submit */
+  .submit-wrap { text-align:center; margin-top:30px; }
+  .btn-submit {
+    padding:14px 36px; font-size:1.02rem; font-weight:900;
+    border-radius: 12px;
+    background: linear-gradient(90deg,#06b6d4,#3b82f6);
+    color:white; border:0; box-shadow: 0 12px 30px rgba(59,130,246,0.18);
+  }
+
+  @media (max-width:720px) {
+    .question-text { font-size:1.25rem; }
+    .choice-btn { font-size:1rem; padding:14px; }
+    #timer { font-size:16px; top:12px; right:12px; padding:8px 12px; }
+  }
+</style>
+
+<script>
+/* Timer - uses backend time_left (seconds) */
+let timeLeft = {{ time_left|default:0 }};
+function startCountdown(){
+  const el = document.getElementById('timer');
+  if(!el) return;
+  function tick(){
+    if(timeLeft <= 0){
+      // auto submit
+      document.getElementById('exam-form').submit();
+      return;
+    }
+    const hrs = Math.floor(timeLeft/3600);
+    const mins = Math.floor((timeLeft%3600)/60);
+    const secs = timeLeft % 60;
+    // show hours when >0
+    let txt = hrs > 0 ? `${hrs}h ${mins}m ${secs}s` : `${mins}m ${secs}s`;
+    el.innerText = txt;
+    timeLeft -= 1;
+    setTimeout(tick,1000);
+  }
+  tick();
+}
+
+/* Question navigation & UI state */
+document.addEventListener('DOMContentLoaded', function(){
+  startCountdown();
+
+  const qCards = Array.from(document.querySelectorAll('.question-card'));
+  const qButtons = Array.from(document.querySelectorAll('.q-btn'));
+  const total = qCards.length;
+
+  function showQuestion(idx) {
+    if(idx < 0) idx = 0;
+    if(idx >= total) idx = total - 1;
+    qCards.forEach((c,i)=> c.style.display = (i===idx ? 'block' : 'none'));
+    qButtons.forEach((b,i)=> {
+      b.classList.remove('current');
+      if(i===idx) b.classList.add('current');
+    });
+    window.scrollTo({top: 0, behavior: 'smooth'});
+  }
+
+  // initialize active answers and buttons state
+  qCards.forEach((card, idx) => {
+    const radios = Array.from(card.querySelectorAll('input[type=radio]'));
+    const anyChecked = radios.some(r=> r.checked);
+    const btn = qButtons[idx];
+    if(anyChecked) {
+      btn.classList.remove('unanswered');
+      btn.classList.add('answered');
+      // highlight the chosen option visually
+      const chosen = radios.find(r=> r.checked);
+      if(chosen) {
+        const label = chosen.closest('label') || chosen.parentElement;
+        if(label) label.classList.add('active');
+      }
+    } else {
+      btn.classList.add('unanswered');
+    }
+
+    // make choice labels clickable and toggle active class
+    const labels = Array.from(card.querySelectorAll('.choice-btn'));
+    labels.forEach(lbl => {
+      lbl.addEventListener('click', function(e){
+        // find radio inside
+        const radio = lbl.querySelector('input[type=radio]');
+        if(radio) {
+          radio.checked = true;
+          // clear active classes in this card
+          labels.forEach(l=> l.classList.remove('active'));
+          lbl.classList.add('active');
+          // mark the q-button as answered
+          qButtons[idx].classList.remove('unanswered');
+          qButtons[idx].classList.add('answered');
+        }
+      });
+    });
+  });
+
+  // q-buttons click -> jump
+  qButtons.forEach((b,i)=> b.addEventListener('click', ()=> showQuestion(i)));
+
+  // Prev/Next controls
+  document.getElementById('btn-prev').addEventListener('click', ()=>{
+    const cur = qButtons.findIndex(b=> b.classList.contains('current'));
+    showQuestion(Math.max(0, cur-1));
+  });
+  document.getElementById('btn-next').addEventListener('click', ()=>{
+    const cur = qButtons.findIndex(b=> b.classList.contains('current'));
+    showQuestion(Math.min(total-1, cur+1));
+  });
+  document.getElementById('btn-first').addEventListener('click', ()=> showQuestion(0));
+  document.getElementById('btn-last').addEventListener('click', ()=> showQuestion(total-1));
+
+  // show first question initially
+  showQuestion(0);
+});
+</script>
+{% endblock %}
+
+{% block content %}
+<div id="timer" aria-live="polite"></div>
+
+<div class="exam-wrap">
+  <h1 style="text-align:center; font-weight:900; color:#0f172a; margin-bottom:18px;">
+    {{ exam.title }}
+  </h1>
+
+  <form id="exam-form" method="post">
+    {% csrf_token %}
+
+    {# Render questions (hidden except current) #}
+    {% for q in exam.questions.all %}
+      <div class="question-card" data-index="{{ forloop.counter0 }}" style="display:none;">
+        <div class="question-number">Q {{ forloop.counter }}</div>
+        <div class="question-text">{{ q.text|linebreaksbr }}</div>
+
+        <div class="choices" role="radiogroup" aria-labelledby="q{{ forloop.counter }}">
+          {% for c in q.choices.all %}
+            {# label contains radio; we will visually toggle .active on label #}
+            <label class="choice-btn" for="choice_{{ c.id }}">
+              <input id="choice_{{ c.id }}" type="radio" name="question_{{ q.id }}" value="{{ c.id }}"
+                {% if submission.answers|get_item:q.id|stringformat:'s' == c.id|stringformat:'s' %}checked{% endif %}>
+              <span style="flex:1">{{ c.text }}</span>
+            </label>
+          {% endfor %}
+        </div>
+      </div>
+    {% endfor %}
+
+    {# Numbered button strip (first -> last) #}
+    <div class="q-strip" role="navigation" aria-label="Question navigation">
+      {% for q in exam.questions.all %}
+        <button type="button" class="q-btn" data-index="{{ forloop.counter0 }}" title="Question {{ forloop.counter }}">
+          {{ forloop.counter }}
+        </button>
+      {% endfor %}
+    </div>
+
+    {# Prev/Next/First/Last controls #}
+    <div class="controls">
+      <button type="button" id="btn-first" class="btn btn-sm btn-light">⏮ First</button>
+      <button type="button" id="btn-prev"  class="btn btn-sm btn-outline-dark">⬅ Previous</button>
+      <button type="button" id="btn-next"  class="btn btn-sm btn-outline-dark">Next ➡</button>
+      <button type="button" id="btn-last"  class="btn btn-sm btn-light">Last ⏭</button>
+    </div>
+
+    <div class="submit-wrap">
+      <button type="submit" class="btn-submit">✅ Submit Exam</button>
+    </div>
+  </form>
+</div>
+{% endblock %}

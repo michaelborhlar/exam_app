@@ -1,0 +1,45 @@
+{% extends 'exams/base.html' %}
+{% block content %}
+<h2>{{ exam.title }}</h2>
+<form method="post">
+  {% csrf_token %}
+  <div id="questions">
+    {% for q in exam.questions.all %}
+      <div class="question" id="q{{ forloop.counter0 }}" style="{% if not forloop.first %}display:none{% endif %}">
+        <p><strong>{{ forloop.counter }}. {{ q.text }}</strong></p>
+        {% for c in q.choices.all %}
+          <label>
+            <input type="radio" name="question_{{ q.id }}" value="{{ c.id }}">
+            {{ c.text }}
+          </label><br>
+        {% endfor %}
+      </div>
+    {% endfor %}
+  </div>
+
+  <div class="navigation">
+    <button type="button" id="prevBtn">Previous</button>
+    <button type="button" id="nextBtn">Next</button>
+    <button type="submit" id="submitBtn" style="display:none">Submit</button>
+  </div>
+</form>
+
+<script>
+let current = 0;
+let questions = document.querySelectorAll('.question');
+let prevBtn = document.getElementById('prevBtn');
+let nextBtn = document.getElementById('nextBtn');
+let submitBtn = document.getElementById('submitBtn');
+
+function showQuestion(index) {
+  questions.forEach((q, i) => q.style.display = (i === index ? 'block' : 'none'));
+  prevBtn.style.display = (index === 0 ? 'none' : 'inline-block');
+  nextBtn.style.display = (index === questions.length - 1 ? 'none' : 'inline-block');
+  submitBtn.style.display = (index === questions.length - 1 ? 'inline-block' : 'none');
+}
+prevBtn.onclick = () => { if (current > 0) { current--; showQuestion(current); } };
+nextBtn.onclick = () => { if (current < questions.length-1) { current++; showQuestion(current); } };
+
+showQuestion(current);
+</script>
+{% endblock %}

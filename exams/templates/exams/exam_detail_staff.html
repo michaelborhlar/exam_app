@@ -1,0 +1,23 @@
+{% extends 'exams/base.html' %}
+{% block title %}Exam Detail{% endblock %}
+{% block content %}
+<h2>{{ exam.title }}</h2>
+<p>{{ exam.description }}</p>
+<p>Start: {{ exam.start_time }} • Duration: {{ exam.duration_minutes }} mins</p>
+
+<h3>Questions</h3>
+<div>
+  {% for q in exam.questions.all %}
+    <div class="card">
+      <strong>{{ forloop.counter }}. {{ q.text }}</strong>
+      <ul>
+        {% for c in q.choices.all %}
+          <li>{{ c.text }} {% if c.is_correct %}(correct){% endif %}</li>
+        {% endfor %}
+      </ul>
+    </div>
+  {% empty %}
+    <p>No questions yet. Upload a Word file or add manually.</p>
+  {% endfor %}
+</div>
+{% endblock %}

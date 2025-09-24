@@ -1,0 +1,15 @@
+{% extends 'exams/base.html' %}
+{% block title %}Student Dashboard{% endblock %}
+{% block content %}
+<h2>Available exams</h2>
+<div class="grid">
+  {% for exam in exams %}
+  <div class="card">
+    <h3>{{ exam.title }}</h3>
+    <p>{{ exam.description }}</p>
+    <p>Start: {{ exam.start_time }} • Duration: {{ exam.duration_minutes }} mins</p>
+    <a class="btn" href="{% url 'exams:exam_detail' exam.id %}">Start / Continue</a>
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}
