@@ -7,6 +7,8 @@ name = "pypi"
 django = "*"
 python-docx = "*"
 pytz = "*"
+psycopg2-binary = "*"
+dj-database-url = "*"
 
 [dev-packages]
 
