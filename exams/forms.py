@@ -15,7 +15,7 @@ class RegisterForm(forms.ModelForm):
 
 class LoginForm(forms.Form):
     username = forms.CharField()
-    password = forms.CharField(widget=forms.PasswordInput)
+    password = forms.CharField(show_hidden_initial=True, widget=forms.PasswordInput)
 
 
 class ExamForm(forms.ModelForm):
